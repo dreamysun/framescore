@@ -1,5 +1,19 @@
 # AI-Native Soundtrack Editing with DiffRhythm
 
+## Interactive Prototype
+
+The repository includes a complete local prototype with three 10-minute video
+inputs, timestamped Music Maps, playable generated scores, cue-level revision,
+and synchronized original/revised comparison.
+
+- [Watch the 60-second product demo](demo/framescore-60s-demo.mp4)
+- [Open the interactive demo source](demo/index.html)
+- [Demo setup and workflow](demo/README.md)
+
+To test the interactive version, clone the repository and open
+`demo/index.html` in a modern browser. Keep all media files in the `demo`
+directory so video and audio paths continue to work.
+
 ## Core Product Thesis
 
 For most video creators, music is still one of the most fragmented parts of the editing workflow.

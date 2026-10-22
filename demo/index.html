@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FrameScore — AI video scoring prototype</title>
+  <style>
+    :root {
+      --ink: #17211b;
+      --muted: #65716a;
+      --line: #dfe5e0;
+      --panel: #f6f8f6;
+      --white: #fff;
+      --green: #b7ed56;
+      --green-dark: #193a24;
+      --green-soft: #edf8dc;
+      --amber: #f2ba62;
+      --rose: #e77d75;
+      --blue: #7cb7c9;
+      --violet: #9d8ac7;
+      --shadow: 0 18px 60px rgba(27, 45, 34, .10);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--white);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    .shell { min-height: 100vh; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 72px;
+      padding: 0 4vw;
+      background: rgba(255,255,255,.92);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 800; letter-spacing: -.03em; }
+    .mark {
+      display: grid; place-items: center;
+      width: 34px; height: 34px;
+      background: var(--green); border: 1px solid #9bd534; border-radius: 50%;
+    }
+    .mark svg { width: 19px; height: 19px; }
+    .demo-pill {
+      padding: 7px 11px; border-radius: 999px; background: var(--panel);
+      border: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 700;
+    }
+    main { width: min(1420px, 92vw); margin: 0 auto; padding: 42px 0 64px; }
+    .intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 30px; margin-bottom: 26px; }
+    .eyebrow { color: #527038; font-size: 12px; text-transform: uppercase; letter-spacing: .14em; font-weight: 800; }
+    h1 { margin: 9px 0 8px; max-width: 760px; font-size: clamp(34px, 4.6vw, 64px); line-height: .98; letter-spacing: -.055em; }
+    .intro p { margin: 0; max-width: 600px; color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .reset {
+      flex: 0 0 auto; border: 1px solid var(--line); background: white; border-radius: 12px;
+      padding: 11px 15px; font-size: 13px; font-weight: 750; cursor: pointer;
+    }
+    .reset:hover { background: var(--panel); }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      min-height: 710px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      overflow: hidden;
+      background: white;
+      box-shadow: var(--shadow);
+    }
+    .workspace { padding: 24px; border-right: 1px solid var(--line); min-width: 0; }
+    .sidebar { padding: 24px; background: #fbfcfb; min-width: 0; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+    .panel-head h2 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+    .status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aab4ad; }
+    .status-dot.live { background: #67b246; box-shadow: 0 0 0 4px #e5f5df; }
+    .video-stage {
+      position: relative; overflow: hidden; aspect-ratio: 16/9; min-height: 280px;
+      border-radius: 17px; background: #18221b; color: white;
+      isolation: isolate;
+    }
+    .video-art { display: none; position: absolute; inset: 0; }
+    .sample-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #101712; }
+    .video-art::before {
+      content: ""; position: absolute; inset: 0;
+      background:
+        radial-gradient(circle at 60% 42%, rgba(190,234,93,.42), transparent 8%),
+        linear-gradient(120deg, transparent 44%, rgba(218,241,193,.14) 45%, transparent 46%),
+        linear-gradient(155deg, #17231b 0 26%, #31513a 26% 27%, #1f3326 27% 53%, #50634c 53% 54%, #243428 54% 100%);
+    }
+    .video-art::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.35));
+    }
+    .ridge { position: absolute; z-index: 1; left: 10%; bottom: 16%; width: 74%; height: 36%; background: #101a13; clip-path: polygon(0 86%, 14% 48%, 22% 58%, 38% 14%, 54% 65%, 68% 30%, 83% 62%, 100% 38%, 100% 100%, 0 100%); opacity: .88; }
+    .figure { position: absolute; z-index: 2; left: 55%; bottom: 17%; width: 12px; height: 52px; border-radius: 10px; background: #090d0a; box-shadow: 0 0 0 4px rgba(255,255,255,.04); }
+    .figure::before { content: ""; position: absolute; left: -2px; top: -13px; width: 16px; height: 16px; border-radius: 50%; background: #090d0a; }
+    .scene-copy { position: absolute; z-index: 3; left: 24px; bottom: 24px; }
+    .scene-copy small { display: block; opacity: .65; margin-bottom: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: .14em; }
+    .scene-copy strong { font-size: 20px; letter-spacing: -.02em; }
+    .media-credit { position: absolute; z-index: 3; right: 16px; top: 14px; padding: 5px 7px; border-radius: 6px; background: rgba(8,15,11,.5); color: rgba(255,255,255,.74); font-size: 9px; letter-spacing: .04em; backdrop-filter: blur(5px); }
+    .dropzone {
+      position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center;
+      background: #f4f7f4; color: var(--ink); border: 1px dashed #aab8ad; border-radius: 17px;
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .dropzone.hidden { opacity: 0; pointer-events: none; transform: scale(.985); }
+    .upload-icon { width: 56px; height: 56px; margin: 0 auto 13px; display: grid; place-items: center; border-radius: 16px; background: white; border: 1px solid var(--line); }
+    .dropzone h3 { margin: 0 0 7px; font-size: 18px; }
+    .dropzone p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+    .drop-inner { width: min(620px, 92%); }
+    .project-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 auto 13px; }
+    .sample-project { min-width: 0; padding: 12px 10px; border: 1px solid var(--line); border-radius: 12px; background: white; cursor: pointer; text-align: left; transition: border .18s, transform .18s, box-shadow .18s; }
+    .sample-project:hover { transform: translateY(-2px); border-color: #91b96b; box-shadow: 0 7px 20px rgba(30,54,38,.08); }
+    .project-number { display: block; margin-bottom: 10px; color: #75945a; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+    .sample-project strong { display: block; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sample-project small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.3; }
+    .upload-own { font-size: 11px; color: var(--muted); }
+    .file-input { display: none; }
+    .primary, .secondary, .icon-btn {
+      border: 0; border-radius: 11px; cursor: pointer; font-weight: 800; transition: transform .15s ease, background .15s ease, opacity .15s ease;
+    }
+    .primary { padding: 12px 16px; background: var(--green); color: #1a291b; box-shadow: inset 0 0 0 1px rgba(43,81,19,.14); }
+    .primary:hover:not(:disabled) { background: #a8e644; transform: translateY(-1px); }
+    .secondary { padding: 11px 14px; background: white; border: 1px solid var(--line); }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    .or { display: inline-block; margin: 0 8px; color: #8c9890; font-size: 12px; }
+    .text-link { padding: 6px 2px; border: 0; background: transparent; color: var(--green-dark); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-weight: 800; }
+    .transport { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .icon-btn { width: 39px; height: 39px; display: grid; place-items: center; background: var(--ink); color: white; }
+    .track-time { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+    .scrubber { flex: 1; accent-color: var(--green-dark); }
+    .sound-label { font-size: 11px; font-weight: 800; color: var(--muted); }
+
+    .timeline { margin-top: 22px; }
+    .timeline-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+    .timeline-head span:first-child { font-size: 12px; font-weight: 850; }
+    .timeline-head span:last-child { font-size: 11px; color: var(--muted); }
+    .timeline-sync {
+      display: none; grid-template-columns: auto minmax(110px, .55fr) minmax(180px, 1fr); align-items: center;
+      gap: 10px; margin-bottom: 9px; padding: 9px 11px; border: 1px solid #d5e6bf; border-radius: 10px;
+      background: #f7fbed; color: #35452f; font-size: 10px;
+    }
+    .timeline.mapped .timeline-sync { display: grid; }
+    .sync-label { display: inline-flex; align-items: center; gap: 6px; color: #557046; font-size: 8px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #6da83d; box-shadow: 0 0 0 4px rgba(109,168,61,.12); }
+    .timeline-sync strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+    .timeline-sync > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+    .timeline-track { position: relative; }
+    .segments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-height: 172px; }
+    .segment {
+      position: relative; overflow: hidden; padding: 12px; border: 1px solid var(--line); border-radius: 11px;
+      background: var(--panel); cursor: pointer; text-align: left; transition: box-shadow .18s, border .18s, transform .18s;
+    }
+    .segment:hover { transform: translateY(-2px); }
+    .segment.playing { border-color: #91bd60; background: #f3f9e8; box-shadow: inset 0 -4px 0 var(--green); }
+    .segment.playing .seg-name { color: #315526; }
+    .segment.selected { border: 2px solid var(--green-dark); padding: 11px; box-shadow: 0 0 0 3px rgba(183,237,86,.45); }
+    .segment.playing.selected { box-shadow: 0 0 0 3px rgba(183,237,86,.45), inset 0 -4px 0 var(--green); }
+    .segment.changed::after {
+      content: "UPDATED"; position: absolute; right: 7px; top: 7px; padding: 3px 5px;
+      border-radius: 5px; background: var(--green); color: #25321d; font-size: 8px; font-weight: 900; letter-spacing: .08em;
+    }
+    .seg-name { position: relative; z-index: 2; display: block; max-width: calc(100% - 4px); font-size: 11px; font-weight: 850; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .seg-time { position: relative; z-index: 2; display: inline-block; margin-top: 5px; padding: 3px 5px; border-radius: 5px; background: rgba(255,255,255,.72); font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .seg-prompt { position: relative; z-index: 2; display: block; margin-top: 9px; color: #455149; font-size: 9px; line-height: 1.35; font-weight: 650; }
+    .seg-prompt::before { content: 'PROMPT'; display: block; margin-bottom: 3px; color: #8a968e; font-size: 7px; letter-spacing: .09em; }
+    .timeline:not(.mapped) .seg-prompt { color: transparent; user-select: none; border-radius: 5px; background: repeating-linear-gradient(90deg,#e7ebe8 0 18px,#f2f4f2 18px 25px); }
+    .timeline:not(.mapped) .seg-prompt::before { color: transparent; }
+    .wave { position: absolute; left: 8px; right: 8px; bottom: 10px; height: 42px; display: flex; align-items: center; gap: 2px; }
+    .bar { flex: 1; min-width: 2px; border-radius: 99px; opacity: .8; transition: height .35s ease, background .35s ease; }
+    .segment:nth-child(1) .bar { background: var(--blue); }
+    .segment:nth-child(2) .bar { background: var(--amber); }
+    .segment:nth-child(3) .bar { background: var(--rose); }
+    .segment:nth-child(4) .bar { background: var(--violet); }
+    .segment.changed .bar { background: var(--green-dark); }
+    .playhead { position: absolute; z-index: 3; left: 0; top: 0; bottom: 0; width: 1px; background: #1f2b24; opacity: .72; pointer-events: none; transition: left .12s linear; }
+    .playhead::before { content: ""; position: absolute; left: -3px; top: -2px; width: 7px; height: 7px; background: #1f2b24; transform: rotate(45deg); }
+    .timeline:not(.mapped) .playhead { display: none; }
+    .preserved { display: none; align-items: center; gap: 8px; margin-top: 12px; color: #45643a; font-size: 12px; font-weight: 750; }
+    .preserved.visible { display: flex; }
+    .check { display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--green-soft); color: #2e6320; }
+
+    .steps { display: flex; gap: 5px; margin-bottom: 22px; }
+    .step { flex: 1; height: 4px; border-radius: 99px; background: #e3e8e4; }
+    .step.on { background: var(--green-dark); }
+    .step.current { background: var(--green); }
+    .stage-label { margin-bottom: 15px; color: var(--muted); font-size: 11px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+    .action-card, .analysis-card, .editor-card, .success-card {
+      border: 1px solid var(--line); background: white; border-radius: 16px; padding: 18px;
+    }
+    .action-card h3, .analysis-card h3, .editor-card h3, .success-card h3 { margin: 0 0 7px; font-size: 17px; letter-spacing: -.025em; }
+    .action-card p, .analysis-card p, .editor-card p, .success-card p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .action-card .primary { width: 100%; margin-top: 18px; }
+    .loading { display: none; margin-top: 18px; }
+    .loading.visible { display: block; }
+    .load-line { height: 6px; border-radius: 99px; overflow: hidden; background: #e9edea; }
+    .load-line::after { content: ""; display: block; width: 40%; height: 100%; background: var(--green-dark); border-radius: inherit; animation: scan 1s ease-in-out infinite alternate; }
+    @keyframes scan { from { transform: translateX(-40%); } to { transform: translateX(240%); } }
+    .loading small { display: block; margin-top: 8px; color: var(--muted); }
+    .analysis-card { display: none; }
+    .analysis-card.visible { display: block; animation: rise .35s ease both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+    .emotion-curve { position: relative; height: 115px; margin: 16px 0; border-bottom: 1px solid var(--line); background: linear-gradient(#fff 31px, #eef1ee 32px, #fff 33px, #fff 64px, #eef1ee 65px, #fff 66px); }
+    .emotion-curve svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+    .curve-label { position: absolute; color: var(--muted); font-size: 9px; }
+    .curve-label.high { top: 4px; left: 0; }
+    .curve-label.low { bottom: 5px; left: 0; }
+    .beats { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+    .beat { padding: 9px; border-radius: 9px; background: var(--panel); }
+    .beat strong { display: block; font-size: 10px; margin-bottom: 3px; }
+    .beat span { color: var(--muted); font-size: 9px; }
+    .analysis-card .primary { width: 100%; margin-top: 15px; }
+    .music-map { display: none; margin-top: 14px; }
+    .music-map.visible { display: block; animation: rise .35s ease both; }
+    .map-row { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .map-row:last-of-type { border-bottom: 0; }
+    .map-row > strong { padding-top: 2px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line); background: white; font-size: 10px; font-weight: 750; }
+    .music-map .primary { width: 100%; margin-top: 14px; }
+    .editor-card { display: none; margin-top: 14px; }
+    .editor-card.visible { display: block; animation: rise .35s ease both; }
+    .selection-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; margin: 9px 0 12px; border-radius: 999px; background: var(--green-soft); font-size: 10px; font-weight: 850; }
+    .prompt-wrap { position: relative; }
+    textarea { width: 100%; min-height: 82px; resize: vertical; border: 1px solid #bdc8c0; border-radius: 11px; padding: 12px; background: #fbfcfb; color: var(--ink); outline: none; line-height: 1.4; }
+    textarea:focus { border-color: var(--green-dark); box-shadow: 0 0 0 3px var(--green-soft); }
+    .regen { width: 100%; margin-top: 10px; }
+    .scope-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .success-card { display: none; margin-top: 14px; border-color: #b7d89d; background: #f7fbf3; }
+    .success-card.visible { display: block; animation: rise .35s ease both; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
+    .compare > div { padding: 10px; border-radius: 9px; background: white; border: 1px solid var(--line); }
+    .compare small { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; font-weight: 850; letter-spacing: .08em; }
+    .compare strong { font-size: 11px; }
+    .compare-btn { width: 100%; margin-top: 10px; padding: 9px 11px; border: 1px solid #aac994; border-radius: 9px; background: white; color: #2f5928; cursor: pointer; font-size: 11px; font-weight: 850; }
+    .map-ready { margin-top: 13px; padding: 11px; border-radius: 10px; background: var(--green-soft); color: #37562e; font-size: 11px; line-height: 1.45; }
+    .footer-note { margin-top: 14px; color: #8a958e; font-size: 10px; text-align: center; }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 50; transform: translate(-50%, 130%); padding: 11px 15px; border-radius: 10px; background: var(--ink); color: white; font-size: 12px; box-shadow: var(--shadow); transition: transform .25s ease; }
+    .toast.show { transform: translate(-50%, 0); }
+
+    @media (max-width: 900px) {
+      main { width: min(94vw, 720px); padding-top: 28px; }
+      .intro { align-items: flex-start; }
+      .workflow { grid-template-columns: 1fr; }
+      .workspace { border-right: 0; border-bottom: 1px solid var(--line); }
+      .sidebar { min-height: 550px; }
+    }
+    @media (max-width: 560px) {
+      .topbar { min-height: 62px; padding: 0 16px; }
+      main { width: 100%; padding: 25px 12px 30px; }
+      .intro { display: block; padding: 0 4px; }
+      .intro .reset { margin-top: 16px; }
+      h1 { font-size: 39px; }
+      .workspace, .sidebar { padding: 15px; }
+      .workflow { border-radius: 18px; }
+      .video-stage { min-height: 220px; }
+      .segments { min-height: 164px; }
+      .timeline-sync { grid-template-columns: 1fr; gap: 4px; }
+      .timeline-sync > span:last-child { white-space: normal; line-height: 1.35; }
+      .segments { grid-template-columns: repeat(4, minmax(165px, 1fr)); overflow-x: auto; scroll-snap-type: x proximity; padding: 3px 3px 8px; }
+      .segment { scroll-snap-align: center; }
+      .segment { padding: 9px 5px; }
+      .segment.selected { padding: 8px 4px; }
+      .seg-name { font-size: 9px; }
+      .seg-time { font-size: 8px; }
+      .seg-prompt { font-size: 8px; }
+      .wave { left: 5px; right: 5px; }
+      .bar:nth-child(even) { display: none; }
+      .compare { grid-template-columns: 1fr; }
+      .project-grid { grid-template-columns: 1fr; gap: 5px; }
+      .sample-project { padding: 8px 10px; }
+      .project-number { display: inline; margin: 0 6px 0 0; }
+      .sample-project strong { display: inline; }
+      .sample-project small { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12h3l2-6 4 12 2-6h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        FrameScore
+      </div>
+      <span class="demo-pill">Interactive prototype</span>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div>
+          <div class="eyebrow">From picture lock to first score</div>
+          <h1>Score the story,<br>not just the timeline.</h1>
+          <p>Upload a cut, let AI understand its emotional shape, then direct the music scene by scene—without losing the parts that already work.</p>
+        </div>
+        <button class="reset" id="resetBtn">↻ Reset demo</button>
+      </section>
+
+      <section class="workflow" aria-label="AI scoring workflow">
+        <div class="workspace">
+          <div class="panel-head">
+            <h2>Picture & score</h2>
+            <div class="status"><span class="status-dot" id="statusDot"></span><span id="statusText">Waiting for video</span></div>
+          </div>
+
+          <div class="video-stage">
+            <div class="video-art"><div class="ridge"></div><div class="figure"></div></div>
+            <video class="sample-video" id="sampleVideo" src="video-1-10min.mp4" preload="metadata" playsinline muted></video>
+            <audio id="scoreAudio" src="score-1-original-10min.m4a" preload="metadata"></audio>
+            <div class="media-credit">NASA/JSC FOOTAGE</div>
+            <div class="scene-copy"><small id="sceneMeta">Sample project 01 · 10:00</small><strong id="sceneTitle">The Way Back</strong></div>
+            <div class="dropzone" id="dropzone">
+              <div class="drop-inner">
+                <h3>Choose one of three video inputs</h3>
+                <p>Each sample has its own analysis, Music Map, and playable scored output.</p>
+                <div class="project-grid">
+                  <button class="sample-project" data-project="0"><span class="project-number">INPUT 01</span><strong>The Way Back</strong><small>Night orbit · reflective cinematic</small></button>
+                  <button class="sample-project" data-project="1"><span class="project-number">INPUT 02</span><strong>Blue Horizon</strong><small>Earth detail · spacious wonder</small></button>
+                  <button class="sample-project" data-project="2"><span class="project-number">INPUT 03</span><strong>Living Planet</strong><small>Cloud motion · intimate pulse</small></button>
+                </div>
+                <div class="upload-own">Or <label class="text-link" for="fileInput">upload your own cut</label></div>
+                <input class="file-input" id="fileInput" type="file" accept="video/*">
+              </div>
+            </div>
+          </div>
+
+          <div class="transport">
+            <button class="icon-btn" id="playBtn" aria-label="Play preview" disabled>
+              <svg id="playIcon" width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3.8v12.4L16 10 5 3.8Z"/></svg>
+            </button>
+            <span class="track-time" id="timeText">00:00 / 10:00</span>
+            <input class="scrubber" id="scrubber" type="range" min="0" max="600" step="0.1" value="0" aria-label="Preview position" disabled>
+            <span class="sound-label">♫ SCORE</span>
+          </div>
+
+          <div class="timeline" id="musicTimeline">
+            <div class="timeline-head"><span>Music Map · timestamped prompts</span><span id="timelineHint">Analyze the cut to reveal</span></div>
+            <div class="timeline-sync" id="timelineSync" aria-live="polite">
+              <span class="sync-label"><i class="sync-dot"></i>Now in video</span>
+              <strong id="currentCueName">Departure · 00:00</strong>
+              <span id="currentCuePrompt">Sparse felt piano, distant low strings, leave room for picture.</span>
+            </div>
+            <div class="timeline-track">
+              <div class="segments" id="segments" aria-label="Soundtrack segments">
+                <button class="segment" data-index="0" disabled><span class="seg-name">Departure</span><span class="seg-time">00:00–02:30</span><span class="seg-prompt">Sparse felt piano, distant low strings, leave room for picture.</span><span class="wave"></span></button>
+                <button class="segment" data-index="1" disabled><span class="seg-name">Night crossing</span><span class="seg-time">02:30–05:00</span><span class="seg-prompt">Introduce a patient cello pulse; widen the sense of scale.</span><span class="wave"></span></button>
+                <button class="segment" data-index="2" disabled><span class="seg-name">First light</span><span class="seg-time">05:00–07:30</span><span class="seg-prompt">Rise into warm harmony, emotional but restrained.</span><span class="wave"></span></button>
+                <button class="segment" data-index="3" disabled><span class="seg-name">Homeward</span><span class="seg-time">07:30–10:00</span><span class="seg-prompt">Return to the piano motif and resolve without a hard ending.</span><span class="wave"></span></button>
+              </div>
+              <div class="playhead" id="mapPlayhead" aria-hidden="true"></div>
+            </div>
+            <div class="preserved" id="preserved"><span class="check">✓</span><span>Only “First light” changed. The other 75% of your score is preserved.</span></div>
+          </div>
+        </div>
+
+        <aside class="sidebar">
+          <div class="steps" aria-label="Workflow progress"><span class="step current"></span><span class="step"></span><span class="step"></span><span class="step"></span></div>
+          <div class="stage-label" id="stageLabel">Step 1 of 4 · Add video</div>
+
+          <div class="action-card" id="actionCard">
+            <h3 id="actionTitle">Your story starts with a cut</h3>
+            <p id="actionCopy">Choose one of three sample videos or upload your own file. Nothing leaves your browser.</p>
+            <button class="primary" id="analyzeBtn" disabled>Analyze emotional arc <span aria-hidden="true">→</span></button>
+            <div class="loading" id="loading"><div class="load-line"></div><small id="loadingText">Reading scene changes, pace, and emotion…</small></div>
+          </div>
+
+          <div class="analysis-card" id="analysisCard">
+            <h3>Emotional arc detected</h3>
+            <p id="analysisSummary">A reflective journey that builds toward quiet release.</p>
+            <div class="emotion-curve">
+              <span class="curve-label high">HIGH</span><span class="curve-label low">LOW</span>
+              <svg viewBox="0 0 420 115" preserveAspectRatio="none" aria-label="Emotional intensity curve">
+                <defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#b7ed56" stop-opacity=".5"/><stop offset="1" stop-color="#b7ed56" stop-opacity="0"/></linearGradient></defs>
+                <path d="M12 94 C55 92 63 72 102 78 S164 92 205 60 S270 25 306 37 S358 80 408 66 L408 112 L12 112 Z" fill="url(#area)"/>
+                <path d="M12 94 C55 92 63 72 102 78 S164 92 205 60 S270 25 306 37 S358 80 408 66" fill="none" stroke="#284b2f" stroke-width="3" stroke-linecap="round"/>
+                <g fill="#b7ed56" stroke="#284b2f" stroke-width="2"><circle cx="12" cy="94" r="4"/><circle cx="102" cy="78" r="4"/><circle cx="270" cy="25" r="4"/><circle cx="408" cy="66" r="4"/></g>
+              </svg>
+            </div>
+            <div class="beats">
+              <div class="beat"><strong>Departure</strong><span>Still · curious</span></div>
+              <div class="beat"><strong>Crossing</strong><span>Motion · awe</span></div>
+              <div class="beat"><strong>First light</strong><span>Peak · release</span></div>
+              <div class="beat"><strong>Return</strong><span>Warm · resolved</span></div>
+            </div>
+            <button class="primary" id="mapBtn">Create Music Map <span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="music-map" id="musicMap">
+            <div class="analysis-card visible">
+              <h3>Music Map ready</h3>
+              <p>The map now lives on the timeline: four timed cues, each with its own generation prompt.</p>
+              <div class="map-ready" id="mapReadyCopy">Select a cue on the left to review its timestamp and generation prompt.</div>
+              <button class="primary" id="generateBtn">Generate soundtrack <span aria-hidden="true">♫</span></button>
+            </div>
+          </div>
+
+          <div class="editor-card" id="editorCard">
+            <h3>Direct a section</h3>
+            <p>Select a segment in the score timeline, then describe only what should change.</p>
+            <div class="selection-chip"><span>●</span><span id="selectedName">First light · 05:00–07:30</span></div>
+            <div class="prompt-wrap"><textarea id="promptInput" aria-label="Revision direction">Make this more emotional</textarea></div>
+            <button class="primary regen" id="regenBtn">Regenerate this section only <span aria-hidden="true">↻</span></button>
+            <div class="scope-note"><span>⌁</span><span>Locked sections keep their melody, timing, and mix exactly as they are.</span></div>
+          </div>
+
+          <div class="success-card" id="successCard">
+            <h3>Section updated</h3>
+            <p id="successCopy">First light now carries more emotional weight, with no changes elsewhere.</p>
+            <div class="compare"><div><small>BEFORE</small><strong>Original score</strong></div><div><small>NOW</small><strong>Revised take · cue only</strong></div></div>
+            <button class="compare-btn" id="compareBtn">Hear original section</button>
+          </div>
+          <div class="footer-note">Real offline video + generated music · AI analysis is simulated</div>
+        </aside>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const video = $('sampleVideo');
+      const audio = $('scoreAudio');
+      const DEMO_DURATION = 600;
+      const SEGMENT_DURATION = 150;
+      const state = {
+        step: 0,
+        selected: 2,
+        project: 0,
+        revised: false,
+        hearingOriginal: false,
+        revisedSrc: '',
+        videoObjectUrl: '',
+        playingSegment: -1,
+        audioSwitchToken: 0
+      };
+      const projects = [
+        {
+          file: 'video-1-10min.mp4', score: 'score-1-original-10min.m4a', title: 'The Way Back',
+          summary: 'A reflective night journey that rises toward the first light of home.',
+          segments: [
+            ['Departure','00:00–02:30','Sparse felt piano, distant low strings, leave room for picture.'],
+            ['Night crossing','02:30–05:00','Introduce a patient cello pulse; widen the sense of scale.'],
+            ['First light','05:00–07:30','Rise into warm harmony, emotional but restrained.'],
+            ['Homeward','07:30–10:00','Return to the piano motif and resolve without a hard ending.']
+          ]
+        },
+        {
+          file: 'video-2-10min.mp4', score: 'score-2-original-10min.m4a', title: 'Blue Horizon',
+          summary: 'Vast, weightless observation gradually opening into luminous wonder.',
+          segments: [
+            ['Drift','00:00–02:30','Airy glass piano and a near-silent pad; feel suspended.'],
+            ['Discovery','02:30–05:00','Add a low cello pulse as new detail enters the frame.'],
+            ['Wide reveal','05:00–07:30','Open the harmony and lift gently into a sense of wonder.'],
+            ['Stillness','07:30–10:00','Thin back to piano and soft air; hold the final view.']
+          ]
+        },
+        {
+          file: 'video-3-10min.mp4', score: 'score-3-original-10min.m4a', title: 'Living Planet',
+          summary: 'An intimate pulse gathers energy as cloud systems come alive beneath us.',
+          segments: [
+            ['Breath','00:00–02:30','Muted piano and soft organic texture, slow and intimate.'],
+            ['Current','02:30–05:00','Introduce a steady pulse that follows the cloud motion.'],
+            ['Awakening','05:00–07:30','Build brighter strings and wider harmony without becoming epic.'],
+            ['Continuum','07:30–10:00','Let the pulse continue, then dissolve into an open ending.']
+          ]
+        }
+      ];
+      let segmentData = projects[0].segments.map(([name, time, prompt]) => ({ name, time, prompt }));
+      const waves = [
+        [22,30,26,42,38,47,36,28,33,45,30,24,20,28,25,18],
+        [25,35,31,49,45,58,52,43,60,48,55,66,56,48,59,52],
+        [34,46,42,58,51,66,54,72,61,78,68,57,63,52,48,42],
+        [43,55,47,39,50,42,34,44,30,38,31,27,35,26,22,18]
+      ];
+      const changedWave = [52,68,46,78,55,86,62,92,74,88,69,81,58,72,48,60];
+
+      function makeWaves() {
+        document.querySelectorAll('.wave').forEach((wave, i) => {
+          wave.innerHTML = waves[i].map((h) => `<i class="bar" style="height:${h}%"></i>`).join('');
+        });
+      }
+      function toast(message) {
+        $('toast').textContent = message;
+        $('toast').classList.add('show');
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => $('toast').classList.remove('show'), 2400);
+      }
+      function setProgress(step, label) {
+        state.step = step;
+        document.querySelectorAll('.step').forEach((el, i) => {
+          el.className = 'step' + (i < step ? ' on' : '') + (i === step ? ' current' : '');
+        });
+        $('stageLabel').textContent = label;
+      }
+      function formatTime(value) {
+        const seconds = Math.max(0, Math.min(DEMO_DURATION, Math.floor(value || 0)));
+        return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+      }
+      function syncMusicMap(time, scrollToCue = false) {
+        const current = Math.max(0, Math.min(DEMO_DURATION - 0.1, Number(time) || 0));
+        const cueIndex = Math.min(segmentData.length - 1, Math.floor(current / SEGMENT_DURATION));
+        const mapped = $('musicTimeline').classList.contains('mapped');
+        const cue = segmentData[cueIndex];
+        const cueElement = document.querySelector(`.segment[data-index="${cueIndex}"]`);
+
+        $('mapPlayhead').style.left = `${(current / DEMO_DURATION) * 100}%`;
+        document.querySelectorAll('.segment').forEach((element, index) => {
+          const isPlaying = mapped && index === cueIndex;
+          element.classList.toggle('playing', isPlaying);
+          if (isPlaying) element.setAttribute('aria-current', 'true');
+          else element.removeAttribute('aria-current');
+        });
+        if (!mapped || !cue) return;
+
+        $('currentCueName').textContent = `${cue.name} · ${formatTime(current)}`;
+        $('currentCuePrompt').textContent = cue.prompt;
+        $('timelineHint').textContent = `Now · ${cue.name}`;
+
+        if (cueIndex !== state.playingSegment) {
+          state.playingSegment = cueIndex;
+          if (scrollToCue && window.matchMedia('(max-width: 560px)').matches) {
+            cueElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+        }
+      }
+      function waitForMedia(media, callback) {
+        const ready = () => {
+          media.removeEventListener('canplay', ready);
+          media.removeEventListener('loadedmetadata', ready);
+          callback();
+        };
+        if (media.readyState >= 2) callback();
+        else {
+          media.addEventListener('canplay', ready, { once: true });
+          media.addEventListener('loadedmetadata', ready, { once: true });
+        }
+      }
+      function pausePreview() {
+        video.pause();
+        audio.pause();
+      }
+      function seekPreview(time) {
+        const target = Math.max(0, Math.min(DEMO_DURATION - 0.1, time));
+        try { video.currentTime = target; } catch (error) { /* metadata is still loading */ }
+        try { audio.currentTime = target; } catch (error) { /* metadata is still loading */ }
+        $('scrubber').value = target;
+        $('timeText').textContent = `${formatTime(target)} / 10:00`;
+        syncMusicMap(target, true);
+      }
+      async function playPreview(token = state.audioSwitchToken) {
+        if (token !== state.audioSwitchToken) return;
+        if (Math.abs((audio.currentTime || 0) - (video.currentTime || 0)) > 0.15) audio.currentTime = video.currentTime;
+        try {
+          await Promise.all([video.play(), audio.play()]);
+          if (token !== state.audioSwitchToken) pausePreview();
+        } catch (error) {
+          pausePreview();
+          toast('Press play again to allow media playback');
+        }
+      }
+      function setAudioSource(src, time, autoplay, callback) {
+        const token = ++state.audioSwitchToken;
+        pausePreview();
+        audio.pause();
+        const onLoaded = () => {
+          if (token !== state.audioSwitchToken) return;
+          const finish = () => {
+            let completed = false;
+            let attempts = 0;
+            let retryTimer;
+            const isCurrent = () => token === state.audioSwitchToken;
+            const complete = () => {
+              if (completed || !isCurrent()) return;
+              completed = true;
+              clearInterval(retryTimer);
+              video.removeEventListener('seeked', check);
+              audio.removeEventListener('seeked', check);
+              if (callback) callback();
+              if (autoplay) playPreview(token);
+            };
+            const check = () => {
+              if (!isCurrent()) {
+                clearInterval(retryTimer);
+                return;
+              }
+              const videoReady = !video.seeking && Math.abs((video.currentTime || 0) - time) < 1;
+              const audioReady = !audio.seeking && Math.abs((audio.currentTime || 0) - time) < 1;
+              if (videoReady && audioReady) complete();
+            };
+            video.addEventListener('seeked', check);
+            audio.addEventListener('seeked', check);
+            seekPreview(time);
+            retryTimer = setInterval(() => {
+              if (!isCurrent()) {
+                clearInterval(retryTimer);
+                return;
+              }
+              attempts += 1;
+              check();
+              if (attempts % 4 === 0 && !completed) seekPreview(time);
+              if (attempts >= 20) complete();
+            }, 200);
+            check();
+          };
+          if (video.readyState >= 1) finish();
+          else {
+            video.addEventListener('loadedmetadata', finish, { once: true });
+            video.load();
+          }
+        };
+        audio.addEventListener('loadedmetadata', onLoaded, { once: true });
+        audio.currentTime = 0;
+        audio.src = src;
+        audio.load();
+      }
+      function updateSegments(project) {
+        segmentData = project.segments.map(([name, time, prompt]) => ({ name, time, prompt }));
+        document.querySelectorAll('.segment').forEach((el, i) => {
+          el.querySelector('.seg-name').textContent = segmentData[i].name;
+          el.querySelector('.seg-time').textContent = segmentData[i].time;
+          el.querySelector('.seg-prompt').textContent = segmentData[i].prompt;
+        });
+        document.querySelectorAll('.beat strong').forEach((el, i) => {
+          el.textContent = segmentData[i].name;
+        });
+      }
+      function loadVideo(name, file, projectIndex = 0) {
+        const project = projects[projectIndex];
+        state.project = projectIndex;
+        state.revised = false;
+        state.hearingOriginal = false;
+        state.revisedSrc = '';
+        state.playingSegment = -1;
+        state.audioSwitchToken += 1;
+        pausePreview();
+        if (state.videoObjectUrl) URL.revokeObjectURL(state.videoObjectUrl);
+        state.videoObjectUrl = file ? URL.createObjectURL(file) : '';
+        video.src = file ? state.videoObjectUrl : project.file;
+        audio.src = project.score;
+        video.load();
+        audio.load();
+        updateSegments(project);
+        makeWaves();
+        document.querySelectorAll('.segment').forEach((el) => el.classList.remove('selected', 'changed', 'playing'));
+        $('musicTimeline').classList.remove('mapped');
+        $('mapPlayhead').style.left = '0%';
+        $('sceneTitle').textContent = file ? name : project.title;
+        $('sceneMeta').textContent = `${file ? 'Uploaded cut' : `Sample project 0${projectIndex + 1}`} · 10:00`;
+        $('analysisSummary').textContent = project.summary;
+        $('dropzone').classList.add('hidden');
+        $('analyzeBtn').disabled = false;
+        $('actionTitle').textContent = 'Video ready for analysis';
+        $('actionCopy').textContent = `${file ? name : project.title} · 10:00 · picture lock`;
+        $('statusText').textContent = 'Video loaded';
+        $('statusDot').classList.add('live');
+        $('timeText').textContent = '00:00 / 10:00';
+        setProgress(1, 'Step 2 of 4 · Understand the story');
+        toast(`${file ? 'Video' : `Sample 0${projectIndex + 1}`} loaded`);
+      }
+      function simulate(button, loadingText, delay, complete) {
+        button.disabled = true;
+        $('loadingText').textContent = loadingText;
+        $('loading').classList.add('visible');
+        setTimeout(() => {
+          $('loading').classList.remove('visible');
+          complete();
+        }, delay);
+      }
+      function enableTimeline() {
+        document.querySelectorAll('.segment').forEach((el) => el.disabled = false);
+        $('playBtn').disabled = false;
+        $('scrubber').disabled = false;
+        $('timelineHint').textContent = 'Select a timed cue to revise';
+      }
+      function enableMapSelection() {
+        document.querySelectorAll('.segment').forEach((el) => el.disabled = false);
+        $('timelineHint').textContent = 'Select a cue to review its prompt';
+      }
+      function selectSegment(index) {
+        state.selected = index;
+        document.querySelectorAll('.segment').forEach((el, i) => el.classList.toggle('selected', i === index));
+        $('selectedName').textContent = `${segmentData[index].name} · ${segmentData[index].time}`;
+        if (state.step === 2 && $('musicMap').classList.contains('visible')) {
+          $('mapReadyCopy').innerHTML = `<strong>${segmentData[index].name} · ${segmentData[index].time}</strong><br>${segmentData[index].prompt}`;
+          $('statusText').textContent = `Reviewing cue · ${segmentData[index].name}`;
+        }
+        if (state.step >= 3) $('editorCard').classList.add('visible');
+      }
+      function reset() {
+        pausePreview();
+        video.currentTime = 0;
+        audio.currentTime = 0;
+        state.step = 0;
+        state.selected = 2;
+        state.revised = false;
+        state.hearingOriginal = false;
+        state.revisedSrc = '';
+        state.playingSegment = -1;
+        state.audioSwitchToken += 1;
+        $('dropzone').classList.remove('hidden');
+        $('analyzeBtn').disabled = true;
+        $('actionTitle').textContent = 'Your story starts with a cut';
+        $('actionCopy').textContent = 'Choose one of three sample videos or upload your own file. Nothing leaves your browser.';
+        $('statusText').textContent = 'Waiting for video';
+        $('statusDot').classList.remove('live');
+        $('analysisCard').classList.remove('visible');
+        $('musicMap').classList.remove('visible');
+        $('editorCard').classList.remove('visible');
+        $('successCard').classList.remove('visible');
+        $('actionCard').style.display = 'block';
+        $('preserved').classList.remove('visible');
+        $('musicTimeline').classList.remove('mapped');
+        $('playBtn').disabled = true;
+        $('scrubber').disabled = true;
+        $('scrubber').value = 0;
+        $('timeText').textContent = '00:00 / 10:00';
+        $('timelineHint').textContent = 'Analyze the cut to reveal';
+        $('playIcon').innerHTML = '<path d="M5 3.8v12.4L16 10 5 3.8Z"/>';
+        document.querySelectorAll('.segment').forEach((el) => {
+          el.disabled = true;
+          el.classList.remove('selected', 'changed', 'playing');
+          el.removeAttribute('aria-current');
+        });
+        $('mapPlayhead').style.left = '0%';
+        $('promptInput').value = 'Make this more emotional';
+        $('fileInput').value = '';
+        $('mapBtn').disabled = false;
+        $('mapBtn').innerHTML = 'Create Music Map <span aria-hidden="true">→</span>';
+        $('mapReadyCopy').textContent = 'Select a cue on the left to review its timestamp and generation prompt.';
+        $('generateBtn').disabled = false;
+        $('generateBtn').innerHTML = 'Generate soundtrack <span aria-hidden="true">♫</span>';
+        $('compareBtn').textContent = 'Hear original section';
+        setProgress(0, 'Step 1 of 4 · Add video');
+        makeWaves();
+      }
+
+      document.querySelectorAll('.sample-project').forEach((button) => {
+        button.addEventListener('click', () => loadVideo(null, null, Number(button.dataset.project)));
+      });
+      $('fileInput').addEventListener('change', (event) => {
+        if (event.target.files[0]) loadVideo(event.target.files[0].name, event.target.files[0], 0);
+      });
+      $('dropzone').addEventListener('dragover', (event) => {
+        event.preventDefault();
+        $('dropzone').style.borderColor = '#284b2f';
+      });
+      $('dropzone').addEventListener('dragleave', () => $('dropzone').style.borderColor = '');
+      $('dropzone').addEventListener('drop', (event) => {
+        event.preventDefault();
+        $('dropzone').style.borderColor = '';
+        const file = event.dataTransfer.files[0];
+        if (file) loadVideo(file.name, file, 0);
+      });
+      $('analyzeBtn').addEventListener('click', () => simulate(
+        $('analyzeBtn'),
+        'Reading scene changes, pace, and emotion…',
+        850,
+        () => {
+          $('actionCard').style.display = 'none';
+          $('analysisCard').classList.add('visible');
+          $('statusText').textContent = 'Emotional arc mapped';
+          $('timelineHint').textContent = 'Create the Music Map to reveal prompts';
+          setProgress(2, 'Step 3 of 4 · Shape the score');
+        }
+      ));
+      $('mapBtn').addEventListener('click', () => {
+        $('musicTimeline').classList.add('mapped');
+        $('musicMap').classList.add('visible');
+        enableMapSelection();
+        selectSegment(state.selected);
+        syncMusicMap(video.currentTime || 0, true);
+        $('mapBtn').disabled = true;
+        $('mapBtn').textContent = 'Music Map created ✓';
+        $('musicTimeline').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      $('generateBtn').addEventListener('click', () => {
+        const project = projects[state.project];
+        $('generateBtn').disabled = true;
+        $('generateBtn').textContent = 'Composing to picture…';
+        setTimeout(() => {
+          setAudioSource(project.score, 0, false);
+          state.revised = false;
+          state.hearingOriginal = false;
+          $('analysisCard').classList.remove('visible');
+          $('musicMap').classList.remove('visible');
+          $('editorCard').classList.add('visible');
+          enableTimeline();
+          selectSegment(state.selected);
+          syncMusicMap(video.currentTime || 0, true);
+          $('statusText').textContent = 'Score ready · audio on';
+          setProgress(3, 'Step 4 of 4 · Preview & refine');
+          toast('Soundtrack generated — press play or revise a timed cue');
+        }, 950);
+      });
+      document.querySelectorAll('.segment').forEach((el) => {
+        el.addEventListener('click', () => selectSegment(Number(el.dataset.index)));
+      });
+      $('regenBtn').addEventListener('click', () => {
+        const direction = $('promptInput').value.trim();
+        if (!direction) {
+          toast('Add a direction for this section');
+          $('promptInput').focus();
+          return;
+        }
+        const button = $('regenBtn');
+        const selected = state.selected;
+        const previewTime = selected * SEGMENT_DURATION + 5;
+        const revisedSrc = `score-${state.project + 1}-segment-${selected + 1}-10min.m4a`;
+        button.disabled = true;
+        button.textContent = 'Rendering selected cue…';
+        setTimeout(() => {
+          state.revised = true;
+          state.hearingOriginal = false;
+          state.revisedSrc = revisedSrc;
+          setAudioSource(revisedSrc, previewTime, true, () => {
+            const target = document.querySelector(`.segment[data-index="${selected}"]`);
+            target.classList.add('changed');
+            target.querySelector('.wave').innerHTML = changedWave.map((h) => `<i class="bar" style="height:${h}%"></i>`).join('');
+            $('successCard').classList.add('visible');
+            $('preserved').classList.add('visible');
+            $('preserved').querySelector('span:last-child').textContent = `Only “${segmentData[selected].name}” changed. The other 75% of your score is preserved.`;
+            $('successCopy').textContent = `${segmentData[selected].name} now carries more emotional weight, with no changes elsewhere.`;
+            $('compareBtn').textContent = 'Hear original section';
+            $('statusText').textContent = '1 section updated · playing revision';
+            button.disabled = false;
+            button.innerHTML = 'Regenerate this section only <span aria-hidden="true">↻</span>';
+            toast('Playing the revised cue now. The other sections stayed locked.');
+          });
+        }, 850);
+      });
+      $('compareBtn').addEventListener('click', () => {
+        if (!state.revisedSrc || $('compareBtn').disabled) return;
+        const time = video.currentTime || (state.selected * SEGMENT_DURATION + 5);
+        state.hearingOriginal = !state.hearingOriginal;
+        const src = state.hearingOriginal ? projects[state.project].score : state.revisedSrc;
+        $('compareBtn').disabled = true;
+        $('compareBtn').textContent = 'Switching score…';
+        setAudioSource(src, time, true, () => {
+          $('compareBtn').disabled = false;
+          $('compareBtn').textContent = state.hearingOriginal ? 'Hear revised section' : 'Hear original section';
+          $('statusText').textContent = state.hearingOriginal ? 'Comparing · original cue' : 'Comparing · revised cue';
+          toast(state.hearingOriginal ? 'Playing the original at the same timestamp' : 'Playing the revised cue at the same timestamp');
+        });
+      });
+      $('playBtn').addEventListener('click', () => {
+        if (video.paused) playPreview();
+        else pausePreview();
+      });
+      video.addEventListener('play', () => {
+        $('playIcon').innerHTML = '<path d="M5 4h4v12H5zM11 4h4v12h-4z"/>';
+      });
+      video.addEventListener('pause', () => {
+        audio.pause();
+        $('playIcon').innerHTML = '<path d="M5 3.8v12.4L16 10 5 3.8Z"/>';
+      });
+      video.addEventListener('ended', () => {
+        audio.pause();
+        seekPreview(0);
+      });
+      video.addEventListener('timeupdate', () => {
+        const current = Math.min(video.currentTime || 0, DEMO_DURATION);
+        $('scrubber').value = current;
+        $('timeText').textContent = `${formatTime(current)} / 10:00`;
+        syncMusicMap(current, !video.paused);
+        if (!video.paused && Math.abs((audio.currentTime || 0) - current) > 0.25) audio.currentTime = current;
+      });
+      $('scrubber').addEventListener('input', (event) => seekPreview(Number(event.target.value)));
+      audio.addEventListener('error', () => toast('The score could not load. Open the packaged folder through its index.html file.'));
+      $('resetBtn').addEventListener('click', reset);
+      makeWaves();
+    })();
+  </script>
+</body>
+</html>
