@@ -65,6 +65,24 @@ For that user, the value proposition is not “generate unlimited music.” It i
 
 ---
 
+## Market Opportunity
+
+The initial market is creators who already spend meaningful time and money sourcing, licensing, cutting, and replacing music for video.
+
+The opportunity is broader than replacing stock-music libraries. As video creation becomes faster and more iterative, soundtrack creation is increasingly one of the remaining parts of the workflow that still feels manual and disconnected.
+
+I would validate market fit before trying to estimate a large top-down TAM. The first signals I would look for are:
+
+- How frequently creators struggle to find music that fits an edit
+- How much time they spend searching for and adapting stock music
+- How often they replace music after changing the video cut
+- Whether they are already paying for stock-music subscriptions or AI creative tools
+- Whether faster, editable soundtrack generation is valuable enough to change their existing workflow
+
+If creators consistently save meaningful editing time and prefer this workflow over searching for stock music, that would be a stronger signal of product-market fit than generation volume alone.
+
+---
+
 ## User Experience
 
 The core workflow would be:
